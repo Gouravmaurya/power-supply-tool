@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabase";
-import { UploadCloud, Search, Loader2, Image as ImageIcon, MapPin, User, Hash, Zap, FileText, LayoutList, PlusCircle } from "lucide-react";
+import { UploadCloud, Search, Loader2, Image as ImageIcon, MapPin, User, Hash, Zap, FileText, LayoutList, PlusCircle, Maximize2, X, Calendar, ArrowRight } from "lucide-react";
 
 const logSchema = z.object({
   consumer_name: z.string().min(1, "Consumer name is required"),
@@ -37,6 +37,10 @@ export default function VoltTrackDashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<"entry" | "search">("entry");
   
+  // Modals state
+  const [selectedLog, setSelectedLog] = useState<LogRecord | null>(null);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -128,25 +132,26 @@ export default function VoltTrackDashboard() {
     return logs.filter(
       (log) =>
         log.consumer_name?.toLowerCase().includes(query) ||
-        log.address?.toLowerCase().includes(query)
+        log.address?.toLowerCase().includes(query) ||
+        log.meter_number.toLowerCase().includes(query)
     );
   }, [logs, searchQuery]);
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground font-sans flex flex-col items-center py-6 px-4 sm:py-10 sm:px-6 lg:px-8">
+    <div className="min-h-[100dvh] bg-background text-foreground font-sans flex flex-col items-center py-6 px-4 sm:py-12 md:py-16 sm:px-6 lg:px-8">
       
       {/* Header Container */}
-      <div className="w-full max-w-4xl mb-6 sm:mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-5">
+      <div className="w-full max-w-4xl mb-8 sm:mb-12 flex flex-col sm:flex-row sm:items-end justify-between gap-5 sm:gap-6">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-display text-foreground">VoltTrack</h1>
-          <p className="text-muted-foreground text-sm mt-1 font-medium">Power Supply Field Manager</p>
+          <h1 className="text-2xl sm:text-4xl font-display text-foreground tracking-tight">VoltTrack</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm mt-1 font-medium">Power Supply Field Manager</p>
         </div>
 
         {/* Segmented Control Tab Navigation */}
         <div className="flex bg-muted p-1 rounded-2xl shadow-inner border border-border/60 relative self-start sm:self-auto w-full sm:w-auto">
           <button
             onClick={() => setActiveTab("entry")}
-            className={`relative flex-1 sm:flex-none flex justify-center items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors z-10 ${
+            className={`relative flex-1 sm:flex-none flex justify-center items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-colors z-10 ${
               activeTab === "entry" ? "text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -164,7 +169,7 @@ export default function VoltTrackDashboard() {
           
           <button
             onClick={() => setActiveTab("search")}
-            className={`relative flex-1 sm:flex-none flex justify-center items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors z-10 ${
+            className={`relative flex-1 sm:flex-none flex justify-center items-center gap-1.5 sm:gap-2 px-3 py-2 sm:px-5 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-xl transition-colors z-10 ${
               activeTab === "search" ? "text-primary" : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -194,17 +199,17 @@ export default function VoltTrackDashboard() {
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
-              <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-5 sm:p-8 rounded-2xl sm:rounded-3xl border-border/80 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)]">
-                <div className="space-y-6 sm:space-y-8">
+              <form onSubmit={handleSubmit(onSubmit)} className="glass-panel p-6 sm:p-10 md:p-12 rounded-2xl sm:rounded-[2rem] border-border/80">
+                <div className="space-y-8 sm:space-y-10">
                   {/* Row 1 */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
                     <div>
                       <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                         <User size={13} /> Consumer Name
                       </label>
                       <input
                         {...register("consumer_name")}
-                        className="w-full bg-input border border-border/50 rounded-xl px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
                         placeholder="e.g. John Doe"
                       />
                       {errors.consumer_name && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.consumer_name.message}</p>}
@@ -216,7 +221,7 @@ export default function VoltTrackDashboard() {
                       </label>
                       <input
                         {...register("meter_number")}
-                        className="w-full bg-input border border-border/50 rounded-xl px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50 uppercase"
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50 uppercase"
                         placeholder="e.g. MT12345"
                       />
                       {errors.meter_number && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.meter_number.message}</p>}
@@ -224,20 +229,20 @@ export default function VoltTrackDashboard() {
                   </div>
 
                   {/* Row 2 */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
                     <div>
                       <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                         <MapPin size={13} /> Address
                       </label>
                       <textarea
                         {...register("address")}
-                        className="w-full bg-input border border-border/50 rounded-xl px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all resize-none h-[122px] placeholder:text-muted-foreground/50"
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all resize-none h-[130px] placeholder:text-muted-foreground/50"
                         placeholder="e.g. 123 Energy Ave, City, ST"
                       />
                       {errors.address && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.address.message}</p>}
                     </div>
 
-                    <div className="space-y-6 sm:space-y-8">
+                    <div className="space-y-8 sm:space-y-10">
                       <div>
                         <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
                           <Zap size={13} /> Reading (kWh)
@@ -246,7 +251,7 @@ export default function VoltTrackDashboard() {
                           type="number"
                           step="0.01"
                           {...register("meter_reading", { valueAsNumber: true })}
-                          className="w-full bg-input border border-border/50 rounded-xl px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                          className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
                           placeholder="0.00"
                         />
                         {errors.meter_reading && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.meter_reading.message}</p>}
@@ -258,7 +263,7 @@ export default function VoltTrackDashboard() {
                         </label>
                         <input
                           {...register("notes")}
-                          className="w-full bg-input border border-border/50 rounded-xl px-4 py-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                          className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
                           placeholder="Any observations..."
                         />
                       </div>
@@ -272,10 +277,11 @@ export default function VoltTrackDashboard() {
                     </label>
                     <div 
                       onClick={() => fileInputRef.current?.click()}
-                      className="border-2 border-dashed border-border/80 rounded-2xl p-6 sm:p-10 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-input/50 hover:border-accent/40 transition-all bg-card shadow-[inset_0_2px_10px_-5px_rgba(0,0,0,0.03)]"
+                      className="border-2 border-dashed border-border/80 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-input/50 hover:border-accent/40 transition-all bg-card"
                     >
                       {imagePreview ? (
                         <div className="relative group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={imagePreview} alt="Preview" className="h-32 sm:h-40 object-contain rounded-xl shadow-md border border-border/50" />
                           <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
                             <span className="text-white text-xs font-semibold">Change Image</span>
@@ -283,7 +289,7 @@ export default function VoltTrackDashboard() {
                         </div>
                       ) : (
                         <>
-                          <div className="h-14 w-14 rounded-full bg-input flex items-center justify-center mb-4 text-accent/80 group-hover:scale-110 transition-transform shadow-sm">
+                          <div className="h-14 w-14 rounded-full bg-input flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform shadow-sm">
                             <UploadCloud size={24} />
                           </div>
                           <span className="text-sm font-bold text-foreground">Click to upload image</span>
@@ -301,7 +307,7 @@ export default function VoltTrackDashboard() {
                   </div>
                 </div>
 
-                <div className="mt-8 sm:mt-10 pt-6 border-t border-border/50 flex justify-end">
+                <div className="mt-10 sm:mt-12 pt-8 border-t border-border/50 flex justify-end">
                   <button
                     type="submit"
                     disabled={isSubmitting || isUploading}
@@ -325,7 +331,7 @@ export default function VoltTrackDashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
-              className="flex flex-col gap-6"
+              className="flex flex-col gap-8"
             >
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-accent transition-colors" size={20} />
@@ -333,14 +339,15 @@ export default function VoltTrackDashboard() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by consumer name or address..."
-                  className="w-full bg-card border border-border/80 rounded-2xl pl-12 pr-4 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent shadow-sm transition-all placeholder:text-muted-foreground/60"
+                  placeholder="Search by consumer name, address, or meter number..."
+                  className="w-full bg-card border border-border/80 rounded-2xl pl-12 pr-5 py-4 sm:py-4.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent shadow-sm transition-all placeholder:text-muted-foreground/60"
                 />
               </div>
 
-              <AnimatePresence>
+              <AnimatePresence mode="wait">
                 {filteredLogs.length === 0 ? (
                   <motion.div 
+                    key="empty"
                     initial={{ opacity: 0 }} 
                     animate={{ opacity: 1 }} 
                     exit={{ opacity: 0 }}
@@ -352,19 +359,26 @@ export default function VoltTrackDashboard() {
                     <p className="font-medium text-sm">No meter logs found.<br/>Try adjusting your search criteria.</p>
                   </motion.div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <motion.div 
+                    key="grid"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8"
+                  >
                     {filteredLogs.map((log, index) => (
                       <motion.div
-                        key={log.id}
+                        key={log.id || `log-${index}`}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                         layout
-                        className="glass-panel p-6 rounded-2xl flex flex-col gap-5 hover:border-accent/30 hover:shadow-lg transition-all duration-300"
+                        onClick={() => setSelectedLog(log)}
+                        className="glass-panel p-5 sm:p-8 rounded-3xl flex flex-col gap-5 sm:gap-6 hover:border-accent/30 hover:shadow-lg transition-all duration-300 cursor-pointer group"
                       >
-                        <div className="flex justify-between items-start gap-4">
+                        <div className="flex flex-wrap sm:flex-nowrap justify-between items-start gap-4 sm:gap-5">
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-display font-medium text-foreground text-xl truncate tracking-wide">{log.consumer_name}</h3>
+                            <h3 className="font-display font-medium text-foreground text-xl truncate tracking-wide group-hover:text-primary transition-colors">{log.consumer_name}</h3>
                             <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1.5 leading-relaxed">
                               <MapPin size={14} className="shrink-0 mt-0.5 text-muted-foreground/70" />
                               <span className="line-clamp-2 font-sans">{log.address}</span>
@@ -375,45 +389,67 @@ export default function VoltTrackDashboard() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-4 text-sm bg-background p-3.5 rounded-xl border border-border/40">
+                        <div className="flex items-center gap-4 text-sm bg-background p-4 rounded-xl border border-border/40">
                           <div className="flex items-center gap-2">
-                            <div className="bg-accent/10 text-accent p-1.5 rounded-md">
-                              <Zap size={14} className="fill-accent" />
+                            <div className="bg-primary/10 text-primary p-1.5 rounded-md">
+                              <Zap size={14} className="fill-primary" />
                             </div>
                             <span className="font-mono font-bold text-foreground text-base tracking-tight">{log.meter_reading}</span>
                             <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mt-0.5">kWh</span>
                           </div>
-                          <div className="w-px h-6 bg-border/60"></div>
-                          <div className="text-xs text-muted-foreground font-semibold flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                            {new Date(log.created_at).toLocaleDateString(undefined, {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </div>
                         </div>
 
                         {log.image_url && (
-                          <div className="rounded-xl overflow-hidden border border-border/50 h-44 bg-input relative transition-colors shadow-sm">
+                          <div 
+                            className="rounded-xl overflow-hidden border border-border/50 h-44 bg-input relative transition-colors shadow-sm cursor-zoom-in group/img"
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent opening the detail modal
+                              setFullscreenImage(log.image_url);
+                            }}
+                          >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img 
                               src={log.image_url} 
                               alt="Meter Proof" 
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
                             />
+                            <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity">
+                              <Maximize2 className="text-white drop-shadow-md" size={24} />
+                            </div>
                           </div>
                         )}
                         
                         {log.notes && (
                           <div className="text-sm bg-blue-50/50 p-3.5 rounded-xl border border-blue-100/50 text-slate-600 flex gap-2.5 items-start">
                             <FileText size={16} className="mt-0.5 shrink-0 text-blue-400" />
-                            <span className="font-medium leading-relaxed">{log.notes}</span>
+                            <span className="font-medium leading-relaxed line-clamp-2">{log.notes}</span>
                           </div>
                         )}
+
+                        <div className="border-t border-border/50 pt-5 mt-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
+                          <div className="text-[10px] text-muted-foreground font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                            <Calendar size={12} className="opacity-70" />
+                            {new Date(log.created_at).toLocaleString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          <button 
+                            className="text-xs font-bold text-primary flex items-center gap-1 group-hover:text-accent transition-colors bg-primary/5 hover:bg-primary/10 px-3 py-1.5 rounded-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLog(log);
+                            }}
+                          >
+                            View Details <ArrowRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+                          </button>
+                        </div>
                       </motion.div>
                     ))}
-                  </div>
+                  </motion.div>
                 )}
               </AnimatePresence>
             </motion.div>
@@ -421,6 +457,152 @@ export default function VoltTrackDashboard() {
 
         </AnimatePresence>
       </div>
+
+      {/* --- MODALS --- */}
+      <AnimatePresence>
+        {/* Detail Modal */}
+        {selectedLog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-foreground/40 backdrop-blur-sm"
+            onClick={() => setSelectedLog(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-card w-full max-w-xl rounded-[2rem] shadow-2xl overflow-hidden border border-border flex flex-col max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()} // Prevent click from closing modal
+            >
+              {/* Modal Header */}
+              <div className="px-8 py-6 border-b border-border/60 flex justify-between items-center bg-muted/30">
+                <h2 className="font-display text-2xl text-foreground">Log Details</h2>
+                <button 
+                  onClick={() => setSelectedLog(null)}
+                  className="p-2 rounded-full hover:bg-input text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 sm:p-8 md:p-10 overflow-y-auto custom-scrollbar">
+                <div className="flex flex-col gap-6 sm:gap-8">
+                  {/* Status Banner */}
+                  <div className="flex items-center justify-between bg-primary/5 border border-primary/10 p-5 rounded-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-primary/20 p-2 rounded-xl text-primary">
+                        <Calendar size={20} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-0.5">Logged On</p>
+                        <p className="font-semibold text-foreground text-sm">
+                          {new Date(selectedLog.created_at).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Core Information */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="bg-input/50 p-3 sm:p-4 rounded-2xl border border-border/40">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1.5 flex items-center gap-1.5"><User size={12} /> Consumer</p>
+                      <p className="font-semibold text-foreground text-sm">{selectedLog.consumer_name}</p>
+                    </div>
+                    <div className="bg-input/50 p-3 sm:p-4 rounded-2xl border border-border/40">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1.5 flex items-center gap-1.5"><Hash size={12} /> Meter #</p>
+                      <p className="font-mono font-bold text-foreground text-sm">{selectedLog.meter_number}</p>
+                    </div>
+                    <div className="sm:col-span-2 bg-input/50 p-3 sm:p-4 rounded-2xl border border-border/40">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1.5 flex items-center gap-1.5"><MapPin size={12} /> Address</p>
+                      <p className="font-medium text-foreground text-sm leading-relaxed">{selectedLog.address}</p>
+                    </div>
+                  </div>
+
+                  {/* Meter Reading Giant Block */}
+                  <div className="bg-gradient-to-br from-primary to-accent p-4 sm:p-5 rounded-2xl text-white shadow-lg shadow-primary/20 flex justify-between items-center">
+                    <div>
+                      <p className="text-white/80 text-[10px] sm:text-[11px] uppercase tracking-widest font-bold mb-1 flex items-center gap-1.5">
+                        <Zap size={14} className="fill-white/80" /> Energy Reading
+                      </p>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="font-mono font-bold text-2xl sm:text-3xl tracking-tight">{selectedLog.meter_reading}</span>
+                        <span className="font-bold text-xs sm:text-sm text-white/90">kWh</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {selectedLog.notes && (
+                    <div>
+                      <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-widest mb-2 flex items-center gap-1.5"><FileText size={12} /> Notes</p>
+                      <div className="bg-muted p-4 rounded-2xl border border-border/60 text-sm font-medium text-foreground/80 leading-relaxed">
+                        {selectedLog.notes}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image */}
+                  {selectedLog.image_url && (
+                    <div>
+                      <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-widest mb-2 flex items-center gap-1.5"><ImageIcon size={12} /> Proof Image</p>
+                      <div 
+                        className="rounded-2xl overflow-hidden border border-border/80 bg-input cursor-zoom-in relative group"
+                        onClick={() => setFullscreenImage(selectedLog.image_url)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={selectedLog.image_url} alt="Full Proof" className="w-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Maximize2 className="text-white drop-shadow-md" size={32} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Fullscreen Image Lightbox Modal */}
+        {fullscreenImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-8 bg-black/95 backdrop-blur-xl"
+            onClick={() => setFullscreenImage(null)}
+          >
+            <button 
+              className="absolute top-4 right-4 sm:top-8 sm:right-8 bg-white/10 hover:bg-white/20 p-3 rounded-full text-white backdrop-blur-sm transition-colors z-[70]"
+              onClick={() => setFullscreenImage(null)}
+            >
+              <X size={24} />
+            </button>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative max-w-5xl max-h-full w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={fullscreenImage} 
+                alt="Fullscreen Preview" 
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" 
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
