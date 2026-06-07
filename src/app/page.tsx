@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/lib/supabase";
+import imageCompression from 'browser-image-compression';
 import { UploadCloud, Search, Loader2, Image as ImageIcon, MapPin, User, Hash, Zap, FileText, LayoutList, PlusCircle, Maximize2, X, Calendar, ArrowRight } from "lucide-react";
 
 const logSchema = z.object({
@@ -83,14 +84,25 @@ export default function VoltTrackDashboard() {
       let image_url = null;
       if (imageFile) {
         setIsUploading(true);
+        
+        const options = {
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 1280,
+          useWebWorker: true,
+        };
+        
+        const compressedFile = await imageCompression(imageFile, options);
+
         // eslint-disable-next-line react-hooks/purity
         const randomSuffix = Math.random().toString(36).substring(7);
+        // Clean filename to prevent upload issues
+        const cleanName = imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '');
         // eslint-disable-next-line react-hooks/purity
-        const fileName = `${Date.now()}-${randomSuffix}-${imageFile.name}`;
+        const fileName = `${Date.now()}-${randomSuffix}-${cleanName}`;
         
         const { error: uploadError } = await supabase.storage
           .from("meter-images")
-          .upload(fileName, imageFile);
+          .upload(fileName, compressedFile);
 
         if (uploadError) throw uploadError;
 
@@ -463,6 +475,7 @@ export default function VoltTrackDashboard() {
         {/* Detail Modal */}
         {selectedLog && (
           <motion.div
+            key="detail-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -573,6 +586,7 @@ export default function VoltTrackDashboard() {
         {/* Fullscreen Image Lightbox Modal */}
         {fullscreenImage && (
           <motion.div
+            key="fullscreen-modal"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
