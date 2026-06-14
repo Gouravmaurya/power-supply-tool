@@ -13,7 +13,11 @@ const logSchema = z.object({
   consumer_name: z.string().min(1, "Consumer name is required"),
   address: z.string().min(1, "Address is required"),
   meter_number: z.string().regex(/^[a-zA-Z0-9]+$/, "Meter number must be alphanumeric"),
-  meter_reading: z.number().positive("Reading must be positive"),
+  kwh: z.number().positive("kWh must be positive"),
+  kvah: z.number().positive("kVAh must be positive"),
+  md: z.number().positive("MD must be positive"),
+  location: z.string().min(1, "Location is required"),
+  reason: z.enum(["burnt", "fully burnt", "defective"], { message: "Please select a reason" }),
   notes: z.string().optional(),
 });
 
@@ -25,6 +29,11 @@ type LogRecord = {
   address: string;
   meter_number: string;
   meter_reading: number;
+  kwh: number | null;
+  kvah: number | null;
+  md: number | null;
+  location: string | null;
+  reason: string | null;
   image_url: string | null;
   notes: string | null;
   created_at: string;
@@ -37,6 +46,7 @@ export default function VoltTrackDashboard() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<"entry" | "search">("entry");
+  const [detectingLocation, setDetectingLocation] = useState(false);
   
   // Modals state
   const [selectedLog, setSelectedLog] = useState<LogRecord | null>(null);
@@ -48,10 +58,43 @@ export default function VoltTrackDashboard() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LogFormData>({
     resolver: zodResolver(logSchema),
   });
+
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setValue("location", `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, {
+          shouldValidate: true,
+        });
+        setDetectingLocation(false);
+      },
+      (error) => {
+        console.error("Error detecting location:", error);
+        let msg = "Failed to detect location.";
+        if (error.code === error.PERMISSION_DENIED) {
+          msg = "Location permission denied. Please allow location access in your browser settings or enter coordinates manually.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          msg = "Location information is currently unavailable. Please enter coordinates manually.";
+        } else if (error.code === error.TIMEOUT) {
+          msg = "Location request timed out. Please try again or enter coordinates manually.";
+        } else {
+          msg += ` (${error.message})`;
+        }
+        alert(msg);
+        setDetectingLocation(false);
+      }
+    );
+  };
 
   const fetchLogs = async () => {
     const { data, error } = await supabase
@@ -119,7 +162,12 @@ export default function VoltTrackDashboard() {
           consumer_name: data.consumer_name,
           address: data.address,
           meter_number: data.meter_number,
-          meter_reading: data.meter_reading,
+          meter_reading: data.kwh,
+          kwh: data.kwh,
+          kvah: data.kvah,
+          md: data.md,
+          location: data.location,
+          reason: data.reason,
           image_url,
           notes: data.notes,
         },
@@ -133,7 +181,11 @@ export default function VoltTrackDashboard() {
       await fetchLogs(); // Refresh list
       setActiveTab("search"); // Switch to search view so they can see the log
     } catch (error) {
-      console.error("Submission failed", error instanceof Error ? error.message : error);
+      console.error("Submission failed", error);
+      const errorMsg = error && typeof error === 'object' && 'message' in error 
+        ? (error as { message: string }).message 
+        : JSON.stringify(error);
+      alert(`Submission failed: ${errorMsg}\n\nNote: If you get a column error, please ensure you have run the schema_update.sql script in your Supabase SQL Editor.`);
       setIsUploading(false);
     }
   };
@@ -248,37 +300,113 @@ export default function VoltTrackDashboard() {
                       </label>
                       <textarea
                         {...register("address")}
-                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all resize-none h-[130px] placeholder:text-muted-foreground/50"
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all resize-none h-[140px] placeholder:text-muted-foreground/50"
                         placeholder="e.g. 123 Energy Ave, City, ST"
                       />
                       {errors.address && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.address.message}</p>}
                     </div>
 
-                    <div className="space-y-8 sm:space-y-10">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
-                          <Zap size={13} /> Reading (kWh)
+                          <Zap size={13} /> kWh Reading
                         </label>
                         <input
                           type="number"
                           step="0.01"
-                          {...register("meter_reading", { valueAsNumber: true })}
-                          className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                          {...register("kwh", { valueAsNumber: true })}
+                          className="w-full bg-input border border-border/50 rounded-xl px-4 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
                           placeholder="0.00"
                         />
-                        {errors.meter_reading && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.meter_reading.message}</p>}
+                        {errors.kwh && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.kwh.message}</p>}
                       </div>
-                      
+
                       <div>
                         <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
-                          <FileText size={13} /> Notes <span className="lowercase font-normal text-muted-foreground/60">(optional)</span>
+                          <Zap size={13} /> kVAh Reading
                         </label>
                         <input
-                          {...register("notes")}
-                          className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
-                          placeholder="Any observations..."
+                          type="number"
+                          step="0.01"
+                          {...register("kvah", { valueAsNumber: true })}
+                          className="w-full bg-input border border-border/50 rounded-xl px-4 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                          placeholder="0.00"
                         />
+                        {errors.kvah && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.kvah.message}</p>}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Row 3 - MD and Location */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <Zap size={13} /> Max Demand (MD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        {...register("md", { valueAsNumber: true })}
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                        placeholder="0.00"
+                      />
+                      {errors.md && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.md.message}</p>}
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5"><MapPin size={13} /> Location Coordinates</span>
+                        <button
+                          type="button"
+                          disabled={detectingLocation}
+                          onClick={handleDetectLocation}
+                          className="text-[10px] text-primary hover:text-accent font-bold uppercase tracking-wider flex items-center gap-1 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          {detectingLocation ? (
+                            <>
+                              <Loader2 className="animate-spin" size={10} /> Detecting...
+                            </>
+                          ) : (
+                            "Auto Detect"
+                          )}
+                        </button>
+                      </label>
+                      <input
+                        {...register("location")}
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                        placeholder="e.g. 28.6139, 77.2090 or Auto Detect"
+                      />
+                      {errors.location && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.location.message}</p>}
+                    </div>
+                  </div>
+
+                  {/* Row 4 - Reason and Notes */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <FileText size={13} /> Reason
+                      </label>
+                      <select
+                        {...register("reason")}
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all"
+                      >
+                        <option value="">Select Reason...</option>
+                        <option value="burnt">Burnt</option>
+                        <option value="fully burnt">Fully Burnt</option>
+                        <option value="defective">Defective</option>
+                      </select>
+                      {errors.reason && <p className="text-red-500 text-xs mt-1.5 font-medium">{errors.reason.message}</p>}
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-1.5">
+                        <FileText size={13} /> Notes <span className="lowercase font-normal text-muted-foreground/60">(optional)</span>
+                      </label>
+                      <input
+                        {...register("notes")}
+                        className="w-full bg-input border border-border/50 rounded-xl px-5 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:bg-card transition-all placeholder:text-muted-foreground/50"
+                        placeholder="Any observations..."
+                      />
                     </div>
                   </div>
 
@@ -401,15 +529,42 @@ export default function VoltTrackDashboard() {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-4 text-sm bg-background p-4 rounded-xl border border-border/40">
-                          <div className="flex items-center gap-2">
-                            <div className="bg-primary/10 text-primary p-1.5 rounded-md">
-                              <Zap size={14} className="fill-primary" />
-                            </div>
-                            <span className="font-mono font-bold text-foreground text-base tracking-tight">{log.meter_reading}</span>
-                            <span className="text-[10px] uppercase font-bold text-muted-foreground/80 tracking-widest mt-0.5">kWh</span>
+                        <div className="grid grid-cols-3 gap-2 bg-background p-3.5 rounded-xl border border-border/40 text-center">
+                          <div className="flex flex-col items-center justify-center py-1">
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">kWh</span>
+                            <span className="font-mono font-bold text-foreground text-sm tracking-tight">{log.kwh ?? log.meter_reading}</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center py-1 border-x border-border/40">
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">kVAh</span>
+                            <span className="font-mono font-bold text-foreground text-sm tracking-tight">{log.kvah ?? "—"}</span>
+                          </div>
+                          <div className="flex flex-col items-center justify-center py-1">
+                            <span className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">MD</span>
+                            <span className="font-mono font-bold text-foreground text-sm tracking-tight">{log.md ?? "—"}</span>
                           </div>
                         </div>
+
+                        {(log.reason || log.location) && (
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {log.reason && (
+                              <span className="px-2.5 py-1 bg-red-500/10 text-red-500 font-bold rounded-lg border border-red-500/20 capitalize">
+                                {log.reason}
+                              </span>
+                            )}
+                            {log.location && (
+                              <a
+                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(log.location)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="px-2.5 py-1 bg-muted hover:bg-input text-muted-foreground hover:text-primary font-semibold rounded-lg border border-border/50 flex items-center gap-1 transition-colors"
+                                title="Show on map"
+                              >
+                                <MapPin size={10} /> {log.location}
+                              </a>
+                            )}
+                          </div>
+                        )}
 
                         {log.image_url && (
                           <div 
@@ -538,17 +693,47 @@ export default function VoltTrackDashboard() {
                     </div>
                   </div>
 
-                  {/* Meter Reading Giant Block */}
-                  <div className="bg-gradient-to-br from-primary to-accent p-4 sm:p-5 rounded-2xl text-white shadow-lg shadow-primary/20 flex justify-between items-center">
+                  {/* Meter Reading details block */}
+                  <div className="bg-gradient-to-br from-primary to-accent p-6 rounded-2xl text-white shadow-lg shadow-primary/20 grid grid-cols-3 gap-4 text-center">
                     <div>
-                      <p className="text-white/80 text-[10px] sm:text-[11px] uppercase tracking-widest font-bold mb-1 flex items-center gap-1.5">
-                        <Zap size={14} className="fill-white/80" /> Energy Reading
-                      </p>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="font-mono font-bold text-2xl sm:text-3xl tracking-tight">{selectedLog.meter_reading}</span>
-                        <span className="font-bold text-xs sm:text-sm text-white/90">kWh</span>
-                      </div>
+                      <p className="text-white/80 text-[10px] uppercase tracking-widest font-bold mb-1">kWh</p>
+                      <p className="font-mono font-bold text-xl sm:text-2xl">{selectedLog.kwh ?? selectedLog.meter_reading}</p>
                     </div>
+                    <div className="border-x border-white/20">
+                      <p className="text-white/80 text-[10px] uppercase tracking-widest font-bold mb-1">kVAh</p>
+                      <p className="font-mono font-bold text-xl sm:text-2xl">{selectedLog.kvah ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-white/80 text-[10px] uppercase tracking-widest font-bold mb-1">MD</p>
+                      <p className="font-mono font-bold text-xl sm:text-2xl">{selectedLog.md ?? "—"}</p>
+                    </div>
+                  </div>
+
+                  {/* Reason & Location Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    {selectedLog.reason && (
+                      <div className="bg-red-500/5 p-3 sm:p-4 rounded-2xl border border-red-500/10">
+                        <p className="text-[10px] uppercase font-bold text-red-500/80 tracking-widest mb-1.5 flex items-center gap-1.5">Reason</p>
+                        <p className="font-bold text-foreground text-sm capitalize">{selectedLog.reason}</p>
+                      </div>
+                    )}
+                    {selectedLog.location && (
+                      <div className="bg-input/50 p-3 sm:p-4 rounded-2xl border border-border/40 flex justify-between items-center">
+                        <div>
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1.5 flex items-center gap-1.5"><MapPin size={12} /> Coordinates</p>
+                          <p className="font-mono font-semibold text-foreground text-sm">{selectedLog.location}</p>
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedLog.location)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-primary/10 hover:bg-primary/20 text-primary p-2.5 rounded-xl transition-colors shrink-0 flex items-center justify-center"
+                          title="Open in Google Maps"
+                        >
+                          <MapPin size={16} />
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Notes */}
